@@ -27,3 +27,5 @@ vendor
 temp
 tmp
 TODO.md
+dist/
+*.tsbuildinfo
