@@ -1,8 +1,8 @@
 'use strict';
 
 const assert = require('assert');
-const ConditionallyExecute = require('./');
-const { GrpcConsensusPlugin, startGrpcNode, QuorumError } = require('./plugins/grpc-consensus');
+const ConditionallyExecute = require('../');
+const { GrpcConsensusPlugin, startGrpcNode, QuorumError } = require('../plugins/grpc-consensus');
 
 // Use high ports to avoid conflicts
 const PORTS = [52100, 52101, 52102];
@@ -46,19 +46,17 @@ describe('GrpcConsensusPlugin', function () {
 
   it('should skip coordinator handler when condition is false', async function () {
     let coordinatorRan = false;
-    let falseBranchRan = false;
 
     await new ConditionallyExecute()
       .use(GrpcConsensusPlugin({
         nodes: PORTS.map((p) => `localhost:${p}`),
         handlerName: 'deploy',
-        quorum: 1, // condition=false means nodes return executed=false, quorum 1 → fails
+        quorum: 1, // condition=false → nodes return executed=false → quorum fails
       }))
       .condition(false)
       .onTrue(() => { coordinatorRan = true; })
-      .onFalse(() => { falseBranchRan = true; })
       .execute()
-      .catch(() => {}); // quorum fails because condition=false → nodes don't execute
+      .catch(() => {}); // expected: quorum not reached
 
     assert.equal(coordinatorRan, false);
   });

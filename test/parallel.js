@@ -17,9 +17,9 @@ const { spawn } = require('child_process');
 const path = require('path');
 
 const TEST_SUITES = [
-  { name: 'core        ', file: 'test.js' },
-  { name: 'multi-thread', file: 'test-multi-threaded.js' },
-  { name: 'grpc        ', file: 'test-grpc.js' },
+  { name: 'core        ', file: 'test/core.js' },
+  { name: 'multi-thread', file: 'test/multi-threaded.js' },
+  { name: 'grpc        ', file: 'test/grpc.js' },
 ];
 
 const startTime = Date.now();
@@ -32,7 +32,7 @@ const jobs = TEST_SUITES.map(({ name, file }) => {
     const chunks = [];
 
     const proc = spawn('npx', ['--yes', 'mocha', '--timeout', '10000', file], {
-      cwd: path.resolve(__dirname),
+      cwd: path.resolve(__dirname, '..'),
       env: { ...process.env, FORCE_COLOR: '1' },
       stdio: ['ignore', 'pipe', 'pipe'],
     });

@@ -110,7 +110,7 @@ async function startGrpcNode(port, handlers = {}, options = {}) {
      * Execute a handler on this node.
      */
     execute(call, callback) {
-      const { request_id, condition, handler_name, metadata } = call.request;
+      const { condition, handler_name, metadata } = call.request;
       const handler = handlers[handler_name];
 
       if (!handler) {
@@ -295,7 +295,6 @@ function GrpcConsensusPlugin(options) {
     );
 
     const succeeded = results.filter((r) => r.success).length;
-    const failed = results.length - succeeded;
 
     if (verbose || process.env.CE_GRPC_DEBUG) {
       for (const r of results) {

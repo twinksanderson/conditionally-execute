@@ -4,7 +4,7 @@ const config = {
   testRunner: 'mocha',
   testRunnerNodeArgs: [],
   mocha: {
-    spec: ['test.js'],
+    spec: ['test/core.js'],
     timeout: 10000,
   },
   mutate: ['index.js'],

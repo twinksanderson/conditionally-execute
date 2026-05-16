@@ -1,3 +1,4 @@
+/* eslint-disable no-console, no-constant-condition */
 'use strict';
 
 /**

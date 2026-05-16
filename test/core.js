@@ -1,12 +1,12 @@
 'use strict';
 
 const assert = require('assert');
-const ConditionallyExecute = require('./');
-const { TimeoutPlugin, TimeoutError } = require('./plugins/timeout');
-const { RetryPlugin }                 = require('./plugins/retry');
-const { DryRunPlugin }                = require('./plugins/dry-run');
-const { AuditLogPlugin }              = require('./plugins/audit-log');
-const { CollectErrorsPlugin }         = require('./plugins/collect-errors');
+const ConditionallyExecute = require('../');
+const { TimeoutPlugin, TimeoutError } = require('../plugins/timeout');
+const { RetryPlugin }                 = require('../plugins/retry');
+const { DryRunPlugin }                = require('../plugins/dry-run');
+const { AuditLogPlugin }              = require('../plugins/audit-log');
+const { CollectErrorsPlugin }         = require('../plugins/collect-errors');
 
 // ---------------------------------------------------------------------------
 // Basic functionality
@@ -128,10 +128,8 @@ describe('condition() semantics', function () {
   });
 
   it('should coerce non-boolean falsy values to false', async function () {
-    let branch = null;
-
     for (const falsy of [0, '', null, undefined, NaN]) {
-      branch = null;
+      let branch = null;
       await new ConditionallyExecute()
         .condition(falsy)
         .onTrue(() => { branch = 'true'; })

@@ -29,3 +29,6 @@ tmp
 TODO.md
 dist/
 *.tsbuildinfo
+reports/
+bun.lock
+bun.lockb

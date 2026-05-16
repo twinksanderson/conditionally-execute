@@ -1,6 +1,6 @@
 {
   "name": "conditionally-execute",
-  "description": "Lets you abandon \"if\" keyword",
+  "description": "Composable conditional execution for Node.js",
   "version": "2.0.0",
   "homepage": "https://github.com/bopke/conditionally-execute",
   "author": "Michał Kubik (https://github.com/bopke)",
@@ -13,43 +13,54 @@
     "url": "https://github.com/bopke/conditionally-execute/issues"
   },
   "files": [
-    "dist",
-    "src"
+    "index.js",
+    "plugins/"
   ],
-  "main": "dist/index.js",
-  "devDependencies": {
-    "eslint": "^9.0.0",
-    "mocha": "^10.8.2",
-    "typescript": "^5.0.0",
-    "@types/node": "^22.0.0"
+  "main": "./index.js",
+  "exports": {
+    ".": "./index.js",
+    "./plugins": "./plugins/index.js",
+    "./plugins/*": "./plugins/*.js"
   },
   "scripts": {
-    "build": "tsc",
-    "typecheck": "tsc --noEmit",
-    "test": "mocha test.js",
-    "lint": "eslint src test.js bench.js",
-    "lint:fix": "eslint src test.js bench.js --fix",
-    "bench": "node bench.js"
+    "test": "node test/parallel.js",
+    "test:core": "mocha --timeout 10000 test/core.js",
+    "test:grpc": "mocha --timeout 15000 test/grpc.js",
+    "test:multi-threaded": "mocha --timeout 15000 test/multi-threaded.js",
+    "lint": "eslint index.js plugins/ test/ bench.js",
+    "lint:fix": "eslint index.js plugins/ test/ bench.js --fix",
+    "bench": "node bench.js",
+    "mutation": "stryker run"
   },
   "keywords": [
-    "if",
+    "conditional",
     "execution",
-    "condition",
-    "conditional execution"
+    "middleware",
+    "composable",
+    "if"
   ],
   "engines": {
     "node": ">=18.0.0"
   },
-  "types": "dist/index.d.ts",
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "require": "./dist/index.js",
-      "default": "./dist/index.js"
-    }
-  },
-  "dependencies": {
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@grpc/grpc-js": "^1.14.3",
-    "@grpc/proto-loader": "^0.8.1"
+    "@grpc/proto-loader": "^0.8.1",
+    "@stryker-mutator/core": "^9.6.1",
+    "@stryker-mutator/mocha-runner": "^9.6.1",
+    "eslint": "^9.0.0",
+    "mocha": "^10.8.2"
+  },
+  "peerDependencies": {
+    "@grpc/grpc-js": ">=1.8.0",
+    "@grpc/proto-loader": ">=0.7.0"
+  },
+  "peerDependenciesMeta": {
+    "@grpc/grpc-js": {
+      "optional": true
+    },
+    "@grpc/proto-loader": {
+      "optional": true
+    }
   }
 }
