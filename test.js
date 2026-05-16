@@ -276,35 +276,35 @@ describe('input validation', function () {
   it('should throw TypeError when onTrue receives a non-function', function () {
     assert.throws(
       () => new ConditionallyExecute().onTrue('not a function'),
-      TypeError
+      (err) => { assert.ok(err instanceof TypeError); assert.match(err.message, /onTrue/); return true; }
     );
   });
 
   it('should throw TypeError when onFalse receives a non-function', function () {
     assert.throws(
       () => new ConditionallyExecute().onFalse(42),
-      TypeError
+      (err) => { assert.ok(err instanceof TypeError); assert.match(err.message, /onFalse/); return true; }
     );
   });
 
   it('should throw TypeError for null passed to onTrue', function () {
     assert.throws(
       () => new ConditionallyExecute().onTrue(null),
-      TypeError
+      (err) => { assert.ok(err instanceof TypeError); assert.match(err.message, /onTrue/); return true; }
     );
   });
 
   it('should throw TypeError when use() receives a non-function', function () {
     assert.throws(
       () => new ConditionallyExecute().use('not a middleware'),
-      TypeError
+      (err) => { assert.ok(err instanceof TypeError); assert.match(err.message, /use/); return true; }
     );
   });
 
   it('should throw TypeError when onError() receives a non-function', function () {
     assert.throws(
       () => new ConditionallyExecute().onError(123),
-      TypeError
+      (err) => { assert.ok(err instanceof TypeError); assert.match(err.message, /onError/); return true; }
     );
   });
 });
@@ -322,6 +322,7 @@ describe('timeout option', function () {
         .execute(),
       (err) => {
         assert.ok(err instanceof ConditionallyExecute.TimeoutError);
+        assert.equal(err.name, 'TimeoutError');
         assert.match(err.message, /50ms/);
         return true;
       }
@@ -355,7 +356,7 @@ describe('retry option', function () {
         if (attempts < 3) throw new Error('transient failure');
       })
       .execute();
-    assert.equal(attempts, 3); // 1 initial + 2 retries
+    assert.equal(attempts, 3); // 1 initial + 2 retries — not 2, not 4
   });
 
   it('should throw after exhausting retries', async function () {
@@ -367,7 +368,52 @@ describe('retry option', function () {
         .execute(),
       /always fails/
     );
-    assert.equal(attempts, 2); // 1 initial + 1 retry
+    assert.equal(attempts, 2); // exactly 2: 1 initial + 1 retry (not 1, not 3)
+  });
+
+  it('should not retry when retry is 0 (default)', async function () {
+    let attempts = 0;
+    await assert.rejects(
+      () => new ConditionallyExecute()
+        .condition(true)
+        .onTrue(() => { attempts++; throw new Error('fail'); })
+        .execute(),
+      /fail/
+    );
+    assert.equal(attempts, 1); // exactly 1 — no retries
+  });
+
+  it('should apply exponential backoff between retries', async function () {
+    let attempts = 0;
+    const times = [];
+    await new ConditionallyExecute({ retry: 2, backoff: 'exponential' })
+      .condition(true)
+      .onTrue(async () => {
+        times.push(Date.now());
+        attempts++;
+        if (attempts < 3) throw new Error('transient');
+      })
+      .execute();
+    assert.equal(attempts, 3);
+    // exponential: attempt 0→1: 100ms, attempt 1→2: 200ms
+    assert.ok(times[1] - times[0] >= 90, `backoff too short: ${times[1] - times[0]}ms`);
+    assert.ok(times[2] - times[1] >= 180, `backoff too short: ${times[2] - times[1]}ms`);
+  });
+
+  it('should apply linear backoff between retries', async function () {
+    let attempts = 0;
+    const times = [];
+    await new ConditionallyExecute({ retry: 2, backoff: 'linear' })
+      .condition(true)
+      .onTrue(async () => {
+        times.push(Date.now());
+        attempts++;
+        if (attempts < 3) throw new Error('transient');
+      })
+      .execute();
+    assert.equal(attempts, 3);
+    // linear: attempt 0→1: 0ms (attempt=0 → 0*100), attempt 1→2: 100ms
+    assert.ok(times[2] - times[1] >= 90, `linear backoff too short: ${times[2] - times[1]}ms`);
   });
 });
 
@@ -434,6 +480,18 @@ describe('middleware (.use())', function () {
     assert.deepEqual(log, ['before', 'handler', 'after']);
   });
 
+  it('should expose correct branch in ctx', async function () {
+    let capturedCtx = null;
+    await new ConditionallyExecute()
+      .use(async (ctx, next) => { capturedCtx = ctx; await next(); })
+      .condition(false)
+      .onTrue(() => {})
+      .onFalse(() => {})
+      .execute();
+    assert.equal(capturedCtx.branch, 'onFalse');
+    assert.equal(capturedCtx.condition, false);
+  });
+
   it('should allow middleware to override condition', async function () {
     let branch = null;
 
@@ -490,6 +548,18 @@ describe('named condition registry', function () {
     assert.equal(branch, 'true');
   });
 
+  it('should NOT use registry for non-string condition values', async function () {
+    // a number 1 should not trigger registry lookup even if coerced to '1'
+    ConditionallyExecute.register('1', () => false); // would return false if used
+    let branch = null;
+    await new ConditionallyExecute()
+      .condition(1) // number, not string — should coerce to true, not registry lookup
+      .onTrue(() => { branch = 'true'; })
+      .onFalse(() => { branch = 'false'; })
+      .execute();
+    assert.equal(branch, 'true'); // number 1 → Boolean(1) = true, not registry
+  });
+
   it('should support dynamic registered conditions', async function () {
     let value = false;
     ConditionallyExecute.register('dynamic', () => value);
@@ -512,9 +582,29 @@ describe('named condition registry', function () {
     assert.equal(branch, 'true');
   });
 
-  it('should throw TypeError for invalid register() arguments', function () {
-    assert.throws(() => ConditionallyExecute.register(123, () => {}), TypeError);
-    assert.throws(() => ConditionallyExecute.register('name', 'not-a-fn'), TypeError);
+  it('should clear registry via clearRegistry()', async function () {
+    ConditionallyExecute.register('myCondition', () => true);
+    ConditionallyExecute.clearRegistry();
+
+    // After clearing, 'myCondition' string is not in registry → treated as truthy string
+    let branch = null;
+    await new ConditionallyExecute()
+      .condition('myCondition') // not in registry → Boolean('myCondition') = true
+      .onTrue(() => { branch = 'true'; })
+      .onFalse(() => { branch = 'false'; })
+      .execute();
+    assert.equal(branch, 'true'); // truthy string, not registry lookup
+  });
+
+  it('should throw TypeError for invalid register() arguments with useful messages', function () {
+    assert.throws(
+      () => ConditionallyExecute.register(123, () => {}),
+      (err) => { assert.ok(err instanceof TypeError); assert.match(err.message, /string/); return true; }
+    );
+    assert.throws(
+      () => ConditionallyExecute.register('name', 'not-a-fn'),
+      (err) => { assert.ok(err instanceof TypeError); assert.match(err.message, /function/); return true; }
+    );
   });
 });
 
@@ -533,8 +623,82 @@ describe('collectErrors option', function () {
       (err) => {
         assert.ok(err instanceof AggregateError);
         assert.equal(err.errors.length, 2);
+        assert.match(err.errors[0].message, /err1/);
+        assert.match(err.errors[1].message, /err2/);
+        assert.match(err.message, /2 handler/);
         return true;
       }
     );
+  });
+
+  it('should not throw AggregateError when all handlers succeed', async function () {
+    let count = 0;
+    await new ConditionallyExecute({ collectErrors: true })
+      .condition(true)
+      .onTrue(() => { count++; })
+      .onTrue(() => { count++; })
+      .execute();
+    assert.equal(count, 2);
+  });
+
+  it('should not include successful handlers in error list', async function () {
+    await assert.rejects(
+      () => new ConditionallyExecute({ collectErrors: true })
+        .condition(true)
+        .onTrue(() => { /* succeeds */ })
+        .onTrue(() => { throw new Error('only-this-fails'); })
+        .execute(),
+      (err) => {
+        assert.ok(err instanceof AggregateError);
+        assert.equal(err.errors.length, 1); // exactly 1, not 2
+        assert.match(err.errors[0].message, /only-this-fails/);
+        return true;
+      }
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// auditLog option
+// ---------------------------------------------------------------------------
+
+describe('auditLog option', function () {
+  it('should log to stdout when auditLog is true', async function () {
+    const logs = [];
+    const original = console.log;
+    console.log = (...args) => logs.push(args.join(' '));
+
+    try {
+      await new ConditionallyExecute({ auditLog: true })
+        .condition(true)
+        .onTrue(() => {})
+        .execute();
+    } finally {
+      console.log = original;
+    }
+
+    assert.equal(logs.length, 1);
+    assert.match(logs[0], /ConditionallyExecute/);
+    assert.match(logs[0], /condition=true/);
+    assert.match(logs[0], /branch=onTrue/);
+    assert.match(logs[0], /handlers=1/);
+    assert.match(logs[0], /duration=/);
+  });
+
+  it('should NOT log when auditLog is false (default)', async function () {
+    const logs = [];
+    const original = console.log;
+    console.log = (...args) => logs.push(args.join(' '));
+
+    try {
+      await new ConditionallyExecute()
+        .condition(true)
+        .onTrue(() => {})
+        .execute();
+    } finally {
+      console.log = original;
+    }
+
+    assert.equal(logs.length, 0);
   });
 });
