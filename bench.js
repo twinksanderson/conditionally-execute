@@ -60,6 +60,27 @@ async function main() {
       .execute();
   });
 
+  console.log('');
+
+  // Sync variants (no Promise overhead)
+  await bench('native if (true branch, sync ctx)', () => {
+    if (true) { noop(); }
+  });
+
+  await bench('ConditionallyExecute.executeSync (true)', () => {
+    new ConditionallyExecute()
+      .condition(true)
+      .onTrue(noop)
+      .executeSync();
+  });
+
+  await bench('ConditionallyExecute.executeSync (false)', () => {
+    new ConditionallyExecute()
+      .condition(false)
+      .onFalse(noop)
+      .executeSync();
+  });
+
   console.log('─'.repeat(60));
   console.log('\n⚠️  native if is faster. Worth it for the DX gains.\n');
 }

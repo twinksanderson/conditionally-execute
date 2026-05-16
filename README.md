@@ -37,6 +37,7 @@
   - [Default condition](#default-condition)
   - [Collecting errors](#collecting-errors)
 - [Performance](#performance)
+- [`executeSync()`](#executesync--void)
 - [TypeScript](#typescript)
 - [Contributing](#contributing)
 - [License](#license)
@@ -115,7 +116,22 @@ Registers a handler for the falsy branch. Throws `TypeError` if `fn` is not a fu
 ### `.execute()` → `Promise<void>`
 
 Executes all handlers for the active branch **concurrently** via `Promise.all`.
-Must be the last method call in the chain.
+Supports async handlers. Must be the last method call in the chain.
+
+### `.executeSync()` → `void`
+
+Executes all handlers for the active branch **synchronously**, in registration order.
+Use when all handlers are synchronous and you want minimal overhead (~1.4x native `if`, no Promise allocation).
+
+> ⚠️ If a handler returns a Promise it is **not** awaited. Use `.execute()` for async handlers.
+
+```javascript
+new ConditionallyExecute()
+  .condition(user.isAdmin)
+  .onTrue(() => grantAccess())
+  .onFalse(() => denyAccess())
+  .executeSync(); // no await needed
+```
 
 ---
 
@@ -211,17 +227,31 @@ await new ConditionallyExecute()
 conditionally-execute benchmark — 100,000 iterations
 
 ────────────────────────────────────────────────────────────
-native if (true branch)                    2.14 ms  (0.021 μs/op)
-native if (false branch)                   2.31 ms  (0.023 μs/op)
-ConditionallyExecute (true)              312.87 ms  (3.129 μs/op)
-ConditionallyExecute (false)             308.14 ms  (3.081 μs/op)
-ConditionallyExecute (default)           297.43 ms  (2.974 μs/op)
+native if (true branch)                    8.06 ms  (0.081 μs/op)
+native if (false branch)                   7.03 ms  (0.070 μs/op)
+ConditionallyExecute.execute (true)       40.51 ms  (0.405 μs/op)   ~5x
+ConditionallyExecute.execute (false)      44.11 ms  (0.441 μs/op)   ~6x
+ConditionallyExecute.execute (default)    40.54 ms  (0.405 μs/op)   ~5x
+
+native if (true branch, sync ctx)          5.76 ms  (0.058 μs/op)
+ConditionallyExecute.executeSync (true)    8.21 ms  (0.082 μs/op)   ~1.4x ✅
+ConditionallyExecute.executeSync (false)   9.62 ms  (0.096 μs/op)   ~1.7x ✅
 ────────────────────────────────────────────────────────────
 
-⚠️  native if is faster. Worth it for the DX gains.
+⚠️  native if is faster. executeSync() closes the gap to ~1.4x.
+    Worth it for the DX gains either way.
 ```
 
 Run benchmarks locally: `node bench.js`
+
+### When to use which
+
+| Use case | Method |
+|---|---|
+| Any async handler | `.execute()` |
+| Multiple concurrent async handlers | `.execute()` |
+| All sync handlers, perf-sensitive path | `.executeSync()` |
+| You want to live dangerously | `.execute()` (drops Promise on floor if not awaited) |
 
 ---
 

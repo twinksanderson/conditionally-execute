@@ -200,6 +200,47 @@ describe('async handlers', function () {
   });
 });
 
+describe('executeSync()', function () {
+  it('should execute onTrue synchronously when condition is true', function () {
+    let called = false;
+    new ConditionallyExecute()
+      .condition(true)
+      .onTrue(() => { called = true; })
+      .executeSync();
+    assert.equal(called, true);
+  });
+
+  it('should execute onFalse synchronously when condition is false', function () {
+    let called = false;
+    new ConditionallyExecute()
+      .condition(false)
+      .onFalse(() => { called = true; })
+      .executeSync();
+    assert.equal(called, true);
+  });
+
+  it('should not execute onFalse when condition is true (sync)', function () {
+    let called = false;
+    new ConditionallyExecute()
+      .condition(true)
+      .onTrue(() => {})
+      .onFalse(() => { called = true; })
+      .executeSync();
+    assert.equal(called, false);
+  });
+
+  it('should execute multiple handlers in registration order (sync)', function () {
+    const order = [];
+    new ConditionallyExecute()
+      .condition(true)
+      .onTrue(() => { order.push(1); })
+      .onTrue(() => { order.push(2); })
+      .onTrue(() => { order.push(3); })
+      .executeSync();
+    assert.deepEqual(order, [1, 2, 3]);
+  });
+});
+
 describe('input validation', function () {
   it('should throw TypeError when onTrue receives a non-function', function () {
     assert.throws(
