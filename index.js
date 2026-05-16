@@ -11,13 +11,6 @@ class ConditionallyExecuteError extends Error {
   }
 }
 
-class TimeoutError extends ConditionallyExecuteError {
-  constructor(ms) {
-    super(`Handler execution timed out after ${ms}ms`);
-    this.name = 'TimeoutError';
-  }
-}
-
 // ---------------------------------------------------------------------------
 // Named condition registry
 // ---------------------------------------------------------------------------
@@ -31,27 +24,15 @@ const _registry = new Map();
 
 /**
  * @typedef {() => void | Promise<void>} Handler
- * A synchronous or asynchronous handler function.
- */
-
-/**
- * @typedef {object} ConditionallyExecuteOptions
- * @property {boolean} [collectErrors=false]  Collect all handler errors into AggregateError instead of short-circuiting.
- * @property {boolean} [dryRun=false]         Log what would execute, but don't call handlers.
- * @property {number|null} [timeout=null]     Abort execution after N ms; throws TimeoutError.
- * @property {number} [retry=0]               Retry failing handlers up to N times.
- * @property {'none'|'linear'|'exponential'} [backoff='none']  Backoff strategy between retries.
- * @property {boolean} [auditLog=false]       Log condition, branch, handler count, and duration to stdout.
  */
 
 /**
  * @typedef {object} ExecutionContext
- * @property {boolean} condition   Current condition value (may be mutated by middleware).
- * @property {string}  branch      Active branch: 'onTrue' | 'onFalse'.
- * @property {Handler[]} handlers  Active handlers (may be mutated by middleware).
- * @property {Handler[]} _onTrue   All registered onTrue handlers.
- * @property {Handler[]} _onFalse  All registered onFalse handlers.
- * @property {ConditionallyExecuteOptions} options
+ * @property {boolean}   condition  Current condition value (may be mutated by middleware).
+ * @property {string}    branch     Active branch: 'onTrue' | 'onFalse'.
+ * @property {Handler[]} handlers   Active handlers for this branch (may be mutated by middleware).
+ * @property {Handler[]} _onTrue    All registered onTrue handlers.
+ * @property {Handler[]} _onFalse   All registered onFalse handlers.
  */
 
 /**
@@ -62,35 +43,23 @@ const _registry = new Map();
  */
 
 /**
- * ConditionallyExecute — enterprise-grade if-statement replacement.
+ * ConditionallyExecute — composable conditional execution.
+ *
+ * Core provides: condition, onTrue, onFalse, onError, use(), execute(), executeSync().
+ * Everything else (timeout, retry, dryRun, audit log, etc.) is a plugin via .use().
  *
  * @example
- * // Basic async
+ * const { TimeoutPlugin, RetryPlugin } = require('./plugins');
+ *
  * await new ConditionallyExecute()
- *   .condition(user.isAdmin)
- *   .onTrue(() => grantAccess())
- *   .onFalse(() => denyAccess())
- *   .execute();
- *
- * @example
- * // With timeout + retry
- * await new ConditionallyExecute({ timeout: 5000, retry: 3, backoff: 'exponential' })
+ *   .use(TimeoutPlugin(5000))
+ *   .use(RetryPlugin(3, { backoff: 'exponential' }))
  *   .condition(isHealthy)
  *   .onTrue(deployToProduction)
  *   .execute();
- *
- * @example
- * // Sync (no Promise overhead)
- * new ConditionallyExecute()
- *   .condition(user.isAdmin)
- *   .onTrue(() => grantAccess())
- *   .executeSync();
  */
 class ConditionallyExecute {
-  /**
-   * @param {ConditionallyExecuteOptions} [options]
-   */
-  constructor(options = {}) {
+  constructor() {
     /** @private @type {boolean} */
     this._condition = true;
     /** @private @type {Handler[]} */
@@ -101,16 +70,6 @@ class ConditionallyExecute {
     this._middlewares = [];
     /** @private @type {((err: Error) => void | Promise<void>)|null} */
     this._errorHandler = null;
-    /** @private */
-    this._options = {
-      collectErrors: false,
-      dryRun: false,
-      timeout: null,
-      retry: 0,
-      backoff: 'none',
-      auditLog: false,
-      ...options,
-    };
   }
 
   // -------------------------------------------------------------------------
@@ -128,17 +87,11 @@ class ConditionallyExecute {
     _registry.set(name, fn);
   }
 
-  /**
-   * Remove a named condition from the registry.
-   * @param {string} name
-   */
+  /** @param {string} name */
   static unregister(name) {
     _registry.delete(name);
   }
 
-  /**
-   * Clear the entire named condition registry.
-   */
   static clearRegistry() {
     _registry.clear();
   }
@@ -192,8 +145,7 @@ class ConditionallyExecute {
   }
 
   /**
-   * Registers an error handler. Called instead of throwing when a handler fails.
-   * If not set, errors propagate normally.
+   * Registers an error handler. Called instead of throwing when execution fails.
    * @param {(err: Error) => void | Promise<void>} fn
    * @returns {this}
    */
@@ -206,17 +158,17 @@ class ConditionallyExecute {
   }
 
   /**
-   * Registers a middleware. Middleware runs before handler execution and can
-   * mutate the execution context (including `ctx.condition`, `ctx.branch`,
-   * `ctx.handlers`). Call `next()` to continue the chain.
+   * Installs a middleware. Middleware receives `(ctx, next)` and can inspect or
+   * mutate `ctx.condition`, `ctx.branch`, and `ctx.handlers` before/after execution.
+   * Middleware composes in registration order.
    *
    * @param {Middleware} middleware
    * @returns {this}
    * @example
    * .use(async (ctx, next) => {
-   *   console.log('before:', ctx.condition);
+   *   console.log('before:', ctx.branch);
    *   await next();
-   *   console.log('after:', ctx.branch);
+   *   console.log('after');
    * })
    */
   use(middleware) {
@@ -233,8 +185,7 @@ class ConditionallyExecute {
 
   /**
    * Executes all active-branch handlers concurrently via `Promise.all`.
-   * Supports async handlers, middleware, timeout, retry, dryRun, and audit log.
-   * Must be the last method call in the chain.
+   * Runs the full middleware chain first.
    * @returns {Promise<void>}
    */
   async execute() {
@@ -242,36 +193,21 @@ class ConditionallyExecute {
     const ctx = {
       condition: this._condition,
       branch: this._condition ? 'onTrue' : 'onFalse',
-      handlers: this._condition ? this._onTrue : this._onFalse,
+      handlers: this._condition ? [...this._onTrue] : [...this._onFalse],
       _onTrue: this._onTrue,
       _onFalse: this._onFalse,
-      options: this._options,
     };
 
-    const startTime = this._options.auditLog ? performance.now() : 0;
-
-    const runChain = async () => {
-      const dispatch = async (index) => {
-        if (index < this._middlewares.length) {
-          await this._middlewares[index](ctx, () => dispatch(index + 1));
-        } else {
-          await this._executeHandlers(ctx);
-        }
-      };
-      await dispatch(0);
+    const dispatch = async (i) => {
+      if (i < this._middlewares.length) {
+        await this._middlewares[i](ctx, () => dispatch(i + 1));
+      } else {
+        await Promise.all(ctx.handlers.map((fn) => fn()));
+      }
     };
 
     try {
-      if (this._options.timeout) {
-        await Promise.race([
-          runChain(),
-          new Promise((_, reject) =>
-            setTimeout(() => reject(new TimeoutError(this._options.timeout)), this._options.timeout)
-          ),
-        ]);
-      } else {
-        await runChain();
-      }
+      await dispatch(0);
     } catch (err) {
       if (this._errorHandler) {
         await this._errorHandler(err);
@@ -279,102 +215,22 @@ class ConditionallyExecute {
       }
       throw err;
     }
-
-    if (this._options.auditLog) {
-      const duration = (performance.now() - startTime).toFixed(2);
-      // eslint-disable-next-line no-console
-      console.log(
-        `[${new Date().toISOString()}] ConditionallyExecute: ` +
-        `condition=${ctx.condition} branch=${ctx.branch} ` +
-        `handlers=${ctx.handlers.length} duration=${duration}ms`
-      );
-    }
   }
 
   /**
    * Executes all active-branch handlers synchronously, in registration order.
-   * No middleware support. No Promise overhead.
-   * Use when all handlers are synchronous and performance matters.
+   * No middleware support. No Promise overhead. Use when handlers are sync
+   * and performance matters.
    * @returns {void}
    */
   executeSync() {
     const handlers = this._condition ? this._onTrue : this._onFalse;
-
-    if (this._options.dryRun) {
-      // eslint-disable-next-line no-console
-      console.log(
-        `[DryRun] ConditionallyExecute: would execute ${handlers.length} ` +
-        `handler(s) on branch ${this._condition ? 'onTrue' : 'onFalse'}`
-      );
-      return;
-    }
-
     for (let i = 0; i < handlers.length; i++) {
       handlers[i]();
     }
   }
-
-  // -------------------------------------------------------------------------
-  // Internals
-  // -------------------------------------------------------------------------
-
-  /** @private */
-  async _executeHandlers(ctx) {
-    if (ctx.options.dryRun) {
-      // eslint-disable-next-line no-console
-      console.log(
-        `[DryRun] ConditionallyExecute: would execute ${ctx.handlers.length} ` +
-        `handler(s) on branch ${ctx.branch}`
-      );
-      return;
-    }
-
-    const invoke = (fn) => this._invokeWithRetry(fn, ctx.options);
-
-    if (ctx.options.collectErrors) {
-      const results = await Promise.allSettled(ctx.handlers.map(invoke));
-      const errors = results.filter((r) => r.status === 'rejected').map((r) => r.reason);
-      if (errors.length > 0) {
-        throw new AggregateError(errors, `${errors.length} handler(s) failed`);
-      }
-      return;
-    }
-
-    await Promise.all(ctx.handlers.map(invoke));
-  }
-
-  /** @private */
-  async _invokeWithRetry(fn, options) {
-    const maxRetries = options.retry || 0;
-    let lastError;
-
-    for (let attempt = 0; attempt <= maxRetries; attempt++) {
-      try {
-        return await fn();
-      } catch (err) {
-        lastError = err;
-        if (attempt < maxRetries) {
-          const delay = ConditionallyExecute._backoffDelay(attempt, options.backoff);
-          if (delay > 0) await new Promise((r) => setTimeout(r, delay));
-        }
-      }
-    }
-
-    throw lastError;
-  }
-
-  /** @private */
-  static _backoffDelay(attempt, strategy) {
-    switch (strategy) {
-      case 'linear': return attempt * 100;
-      case 'exponential': return Math.pow(2, attempt) * 100;
-      default: return 0;
-    }
-  }
 }
 
-// Expose error types as static properties
-ConditionallyExecute.TimeoutError = TimeoutError;
 ConditionallyExecute.ConditionallyExecuteError = ConditionallyExecuteError;
 
 module.exports = ConditionallyExecute;
