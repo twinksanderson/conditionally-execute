@@ -108,7 +108,7 @@ class ConditionallyExecute {
    * @returns {this}
    */
   condition(condition) {
-    if (typeof condition === 'string' && _registry.has(condition)) {
+    if (_registry.has(condition)) {
       this._condition = Boolean(_registry.get(condition)());
     } else {
       this._condition = Boolean(condition);

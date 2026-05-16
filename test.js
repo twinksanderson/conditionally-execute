@@ -484,6 +484,13 @@ describe('onError()', function () {
     assert.match(caughtError.message, /handler blew up/);
   });
 
+  it('ConditionallyExecuteError should have correct name property', function () {
+    const err = new ConditionallyExecute.ConditionallyExecuteError('test');
+    assert.equal(err.name, 'ConditionallyExecuteError');
+    assert.equal(err.message, 'test');
+    assert.ok(err instanceof Error);
+  });
+
   it('should call onError with TimeoutError on timeout', async function () {
     let caughtError = null;
     await new ConditionallyExecute()
@@ -626,14 +633,17 @@ describe('named condition registry', function () {
   });
 
   it('should NOT use registry for non-string condition values', async function () {
-    ConditionallyExecute.register('1', () => false);
+    // Register string keys whose string representation matches truthy/falsy values.
+    // If typeof check is removed, passing a non-string would still miss the Map key
+    // (Map is type-strict). This test verifies boolean false is coerced, not registry-looked-up.
+    ConditionallyExecute.register('false', () => true); // would flip branch if used
     let branch = null;
     await new ConditionallyExecute()
-      .condition(1) // number, not string — should coerce to true, not registry lookup
+      .condition(false) // boolean, not string — must NOT hit registry
       .onTrue(() => { branch = 'true'; })
       .onFalse(() => { branch = 'false'; })
       .execute();
-    assert.equal(branch, 'true');
+    assert.equal(branch, 'false'); // Boolean(false) = false, registry not consulted
   });
 
   it('should support dynamic registered conditions', async function () {
@@ -659,16 +669,40 @@ describe('named condition registry', function () {
   });
 
   it('should clear registry via clearRegistry()', async function () {
-    ConditionallyExecute.register('myCondition', () => true);
+    // register a condition that returns FALSE — so if clear() did nothing, branch would be 'false'
+    ConditionallyExecute.register('myCondition', () => false);
     ConditionallyExecute.clearRegistry();
 
     let branch = null;
     await new ConditionallyExecute()
-      .condition('myCondition') // not in registry → Boolean('myCondition') = true
+      .condition('myCondition') // not in registry after clear → Boolean('myCondition') = true
+      .onTrue(() => { branch = 'true'; })
+      .onFalse(() => { branch = 'false'; })
+      .execute();
+    assert.equal(branch, 'true'); // proves clear() actually removed the entry
+  });
+
+  it('should remove a single entry via unregister()', async function () {
+    ConditionallyExecute.register('gone', () => false);
+    ConditionallyExecute.register('stays', () => false);
+    ConditionallyExecute.unregister('gone');
+
+    // 'gone' is no longer in registry → Boolean('gone') = true
+    let branch = null;
+    await new ConditionallyExecute()
+      .condition('gone')
       .onTrue(() => { branch = 'true'; })
       .onFalse(() => { branch = 'false'; })
       .execute();
     assert.equal(branch, 'true');
+
+    // 'stays' still resolves via registry → false
+    await new ConditionallyExecute()
+      .condition('stays')
+      .onTrue(() => { branch = 'true'; })
+      .onFalse(() => { branch = 'false'; })
+      .execute();
+    assert.equal(branch, 'false');
   });
 
   it('should throw TypeError for invalid register() arguments with useful messages', function () {
