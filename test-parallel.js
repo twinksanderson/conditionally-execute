@@ -17,8 +17,9 @@ const { spawn } = require('child_process');
 const path = require('path');
 
 const TEST_SUITES = [
-  { name: 'core     ', file: 'test.js' },
-  { name: 'consensus', file: 'test-consensus.js' },
+  { name: 'core        ', file: 'test.js' },
+  { name: 'multi-thread', file: 'test-multi-threaded.js' },
+  { name: 'grpc        ', file: 'test-grpc.js' },
 ];
 
 const startTime = Date.now();

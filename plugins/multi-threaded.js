@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * ConsensusPlugin — distributed consensus for your if-statements.
+ * MultiThreadedPlugin — distributed consensus for your if-statements.
  *
  * Spawns N worker threads acting as independent consensus nodes. Each node
  * receives the condition value and casts a vote. The majority vote determines
@@ -9,10 +9,10 @@
  * MessageChannel (in-process RPC — production-grade architecture 🫡).
  *
  * @example
- * const { ConsensusPlugin } = require('conditionally-execute/plugins/consensus');
+ * const { MultiThreadedPlugin } = require('conditionally-execute/plugins/multi-threaded');
  *
  * await new ConditionallyExecute()
- *   .use(ConsensusPlugin({ nodes: 5 }))
+ *   .use(MultiThreadedPlugin({ nodes: 5 }))
  *   .condition(userIsAdmin)
  *   .onTrue(() => grantAccess())
  *   .onFalse(() => denyAccess())
@@ -71,7 +71,7 @@ async function collectVotes(condition, nodeCount, timeoutMs, jitter) {
       if (settled) return;
       settled = true;
       workers.forEach((w) => w.terminate());
-      reject(new Error(`ConsensusPlugin: vote collection timed out after ${timeoutMs}ms`));
+      reject(new Error(`MultiThreadedPlugin: vote collection timed out after ${timeoutMs}ms`));
     }, timeoutMs);
 
     for (let i = 0; i < nodeCount; i++) {
@@ -118,19 +118,19 @@ async function collectVotes(condition, nodeCount, timeoutMs, jitter) {
  */
 
 /**
- * Creates a ConsensusPlugin middleware for ConditionallyExecute.
+ * Creates a MultiThreadedPlugin middleware for ConditionallyExecute.
  *
  * @param {ConsensusOptions} [options]
  * @returns {import('../index').Middleware}
  */
-function ConsensusPlugin(options = {}) {
+function MultiThreadedPlugin(options = {}) {
   const { nodes = 3, timeout = 2000, jitter = false, verbose = false } = options;
 
   if (!Number.isInteger(nodes) || nodes < 3) {
-    throw new Error('ConsensusPlugin: nodes must be an integer ≥ 3');
+    throw new Error('MultiThreadedPlugin: nodes must be an integer ≥ 3');
   }
   if (nodes % 2 === 0) {
-    throw new Error('ConsensusPlugin: nodes must be odd to guarantee a clear majority');
+    throw new Error('MultiThreadedPlugin: nodes must be odd to guarantee a clear majority');
   }
 
   return async function consensusMiddleware(ctx, next) {
@@ -143,7 +143,7 @@ function ConsensusPlugin(options = {}) {
     if (verbose || process.env.CE_CONSENSUS_DEBUG) {
       // eslint-disable-next-line no-console
       console.log(
-        `[ConsensusPlugin] ${nodes} nodes voted: ` +
+        `[MultiThreadedPlugin] ${nodes} nodes voted: ` +
         `${trueVotes} true / ${falseVotes} false → consensus=${consensus}`
       );
     }
@@ -157,4 +157,4 @@ function ConsensusPlugin(options = {}) {
   };
 }
 
-module.exports = { ConsensusPlugin, collectVotes };
+module.exports = { MultiThreadedPlugin, collectVotes };
