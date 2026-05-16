@@ -17,15 +17,20 @@
   ],
   "main": "index.js",
   "devDependencies": {
+    "eslint": "^9.39.4",
     "mocha": "^10.8.2"
   },
   "scripts": {
-    "test": "mocha"
+    "test": "mocha",
+    "lint": "eslint index.js test.js"
   },
   "keywords": [
     "if",
     "execution",
     "condition",
     "conditional execution"
-  ]
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  }
 }
