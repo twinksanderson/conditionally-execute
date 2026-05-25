@@ -35,7 +35,7 @@ import java.util.concurrent.TimeUnit;
  *       Thrown exceptions surface as {@code error} (still {@code executed=false}).</li>
  * </ul>
  */
-public final class GrpcNodeServer implements AutoCloseable {
+public final class GrpcNodeServer {
 
     /** Builder for {@link GrpcNodeServer}. */
     public static final class Builder {
