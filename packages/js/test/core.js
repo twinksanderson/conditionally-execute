@@ -2,11 +2,11 @@
 
 const assert = require('assert');
 const ConditionallyExecute = require('../');
-const { TimeoutPlugin, TimeoutError } = require('../plugins/timeout');
-const { RetryPlugin }                 = require('../plugins/retry');
-const { DryRunPlugin }                = require('../plugins/dry-run');
-const { AuditLogPlugin }              = require('../plugins/audit-log');
-const { CollectErrorsPlugin }         = require('../plugins/collect-errors');
+const { TimeoutPlugin, TimeoutError } = require('../src/plugins/timeout');
+const { RetryPlugin }                 = require('../src/plugins/retry');
+const { DryRunPlugin }                = require('../src/plugins/dry-run');
+const { AuditLogPlugin }              = require('../src/plugins/audit-log');
+const { CollectErrorsPlugin }         = require('../src/plugins/collect-errors');
 
 // ---------------------------------------------------------------------------
 // Basic functionality

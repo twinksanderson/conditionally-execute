@@ -8,7 +8,7 @@
  * Expected conclusion: worth it anyway for the readability gains.
  */
 
-const ConditionallyExecute = require('./index.js');
+const ConditionallyExecute = require('./src/index.js');
 
 const ITERATIONS = 100_000;
 

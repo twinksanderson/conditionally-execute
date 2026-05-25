@@ -7,7 +7,7 @@ const config = {
     spec: ['test/core.js'],
     timeout: 10000,
   },
-  mutate: ['index.js'],
+  mutate: ['src/index.js'],
   reporters: ['progress', 'clear-text', 'html'],
   htmlReporter: {
     fileName: 'reports/mutation/mutation.html',

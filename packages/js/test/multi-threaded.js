@@ -8,7 +8,7 @@
 
 const assert = require('assert');
 const ConditionallyExecute = require('../');
-const { MultiThreadedPlugin } = require('../plugins/multi-threaded');
+const { MultiThreadedPlugin } = require('../src/plugins/multi-threaded');
 
 describe('MultiThreadedPlugin', function () {
   this.timeout(10000); // consensus involves worker threads

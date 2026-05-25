@@ -2,7 +2,7 @@
 
 const assert = require('assert');
 const ConditionallyExecute = require('../');
-const { GrpcConsensusPlugin, startGrpcNode, QuorumError } = require('../plugins/grpc-consensus');
+const { GrpcConsensusPlugin, startGrpcNode, QuorumError } = require('../src/plugins/grpc-consensus');
 
 // Use high ports to avoid conflicts
 const PORTS = [52100, 52101, 52102];

@@ -1,66 +1,19 @@
 {
-  "name": "conditionally-execute",
-  "description": "Composable conditional execution for Node.js",
+  "name": "conditionally-execute-monorepo",
   "version": "2.0.0",
-  "homepage": "https://github.com/bopke/conditionally-execute",
-  "author": "Michał Kubik (https://github.com/bopke)",
+  "description": "Monorepo for conditionally-execute (JavaScript + Java).",
+  "private": true,
   "license": "MIT",
-  "contributors": [
-    "Michał Kubik (https://github.com/bopke)"
-  ],
   "repository": "bopke/conditionally-execute",
-  "bugs": {
-    "url": "https://github.com/bopke/conditionally-execute/issues"
-  },
-  "files": [
-    "index.js",
-    "plugins/"
+  "homepage": "https://github.com/bopke/conditionally-execute",
+  "workspaces": [
+    "packages/js"
   ],
-  "main": "./index.js",
-  "exports": {
-    ".": "./index.js",
-    "./plugins": "./plugins/index.js",
-    "./plugins/*": "./plugins/*.js"
-  },
   "scripts": {
-    "test": "node test/parallel.js",
-    "test:core": "mocha --timeout 10000 test/core.js",
-    "test:grpc": "mocha --timeout 15000 test/grpc.js",
-    "test:multi-threaded": "mocha --timeout 15000 test/multi-threaded.js",
-    "lint": "eslint index.js plugins/ test/ bench.js",
-    "lint:fix": "eslint index.js plugins/ test/ bench.js --fix",
-    "bench": "node bench.js",
-    "mutation": "stryker run"
-  },
-  "keywords": [
-    "conditional",
-    "execution",
-    "middleware",
-    "composable",
-    "if"
-  ],
-  "engines": {
-    "node": ">=18.0.0"
-  },
-  "devDependencies": {
-    "@eslint/js": "^10.0.1",
-    "@grpc/grpc-js": "^1.14.3",
-    "@grpc/proto-loader": "^0.8.1",
-    "@stryker-mutator/core": "^9.6.1",
-    "@stryker-mutator/mocha-runner": "^9.6.1",
-    "eslint": "^9.0.0",
-    "mocha": "^10.8.2"
-  },
-  "peerDependencies": {
-    "@grpc/grpc-js": ">=1.8.0",
-    "@grpc/proto-loader": ">=0.7.0"
-  },
-  "peerDependenciesMeta": {
-    "@grpc/grpc-js": {
-      "optional": true
-    },
-    "@grpc/proto-loader": {
-      "optional": true
-    }
+    "test": "npm test --workspace=packages/js",
+    "test:js": "npm test --workspace=packages/js",
+    "test:java": "cd packages/java && ./gradlew test",
+    "lint": "npm run lint --workspace=packages/js",
+    "bench": "npm run bench --workspace=packages/js"
   }
 }

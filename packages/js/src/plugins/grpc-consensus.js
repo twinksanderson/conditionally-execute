@@ -46,7 +46,8 @@ const { randomUUID } = require('crypto');
 // Load proto definition
 // ---------------------------------------------------------------------------
 
-const PROTO_PATH = path.join(__dirname, 'proto', 'conditionally_execute.proto');
+// Proto lives at monorepo root (../../../../proto/) — shared with the Java module.
+const PROTO_PATH = path.join(__dirname, '..', '..', '..', '..', 'proto', 'conditionally_execute.proto');
 
 const packageDef = protoLoader.loadSync(PROTO_PATH, {
   keepCase: true,
