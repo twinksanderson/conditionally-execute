@@ -1,4 +1,5 @@
 import com.google.protobuf.gradle.id
+import java.time.Duration
 
 plugins {
     `java-library`
@@ -99,7 +100,7 @@ tasks.test {
         showStandardStreams = false
     }
     // Allow long-running gRPC tests
-    timeout = java.time.Duration.ofMinutes(2)
+    timeout = Duration.ofMinutes(2)
 }
 
 tasks.compileJava {
