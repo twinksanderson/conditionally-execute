@@ -93,6 +93,15 @@ sourceSets {
     }
 }
 
+// processResources picks up the staged proto dir (it lives under build/ and
+// the protobuf plugin maps proto srcDirs into the resources source set).
+// Tell Gradle about the implicit dependency, and exclude .proto files from
+// the runtime jar — they're not needed at runtime, the generated Java is.
+tasks.processResources {
+    dependsOn(stageProto)
+    exclude("**/*.proto")
+}
+
 tasks.test {
     useJUnitPlatform()
     testLogging {
